@@ -1,5 +1,8 @@
 # Custom tweaks for [Padavan firmware](https://bitbucket.org/padavan/rt-n56u)
 
+## Usage:
+Run *add-all.bat* to upload all tweaks to VM (e.g. VirtualBox)
+
 ## List of included tweaks:
 - web interface theme pack
 - router's front LED tweaks
