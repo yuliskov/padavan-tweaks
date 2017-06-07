@@ -1,0 +1,2 @@
+restoreLogo('xiaomi-big');
+restoreBackground();

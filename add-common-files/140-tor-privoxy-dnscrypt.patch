@@ -1,0 +1,981 @@
+--- ./libs/libevent/Makefile.orig	2016-06-20 16:35:50.137815717 +0300
++++ ./libs/libevent/Makefile	2016-06-20 16:37:20.722068986 +0300
+@@ -14,8 +14,8 @@
+ 	( cd $(SRC_NAME) ; \
+ 	./configure \
+ 		--prefix=$(STAGEDIR) \
+-		--enable-static \
+-		--disable-shared \
++		--disable-static \
++		--enable-shared \
+ 		--disable-debug-mode \
+ 		--host=$(HOST_TARGET) \
+ 		--build=$(HOST_BUILD) ; \
+@@ -31,4 +31,5 @@
+ 	$(MAKE) -C $(SRC_NAME) install DESTDIR=""
+ 
+ romfs:
++	cp -fP $(DESTDIR)/lib/libevent-2.0.so* $(ROMFSDIR)/lib
+ 
+--- ./libs/libssl/Makefile.orig	2017-05-23 12:38:22.361851944 +0300
++++ ./libs/libssl/Makefile	2017-05-23 12:39:26.507377472 +0300
+@@ -12,16 +12,24 @@
+ OPENSSL_APPS =
+ 
+ OPENSSL_CIPHERS = no-capieng no-cms no-gmp no-jpake no-rfc3779 no-seed \
+-                  no-ec2m no-err no-threads no-idea no-rc2 no-rc5 no-ripemd no-rmd160 \
++                  no-ec2m no-err no-idea no-rc2 no-rc5 no-ripemd no-rmd160 \
+                   no-static-engine no-hw no-md2 no-sse2 no-dso no-ts no-sha0 no-mdc2 no-krb5 \
+                   no-smime no-ans1 no-cast no-whirlpool no-sctp no-srp no-ssl2 no-ssl3
++ 
++ifeq ($(CONFIG_FIRMWARE_INCLUDE_TOR),y)
++CONFIG_FIRMWARE_INCLUDE_OPENSSL_EC=y
++else
++OPENSSL_CIPHERS += no-threads
++endif
+ 
+ ifdef CONFIG_CRYPTO_DEV_LINUX
+ COPTS+=-DHAVE_CRYPTODEV
+ else
+ OPENSSL_APPS += no-speed
++ifneq ($(CONFIG_FIRMWARE_INCLUDE_TOR),y)
+ OPENSSL_CIPHERS += no-engine
+ endif
++endif
+ 
+ ifneq ($(CONFIG_FIRMWARE_INCLUDE_OPENSSL_EC),y)
+ OPENSSL_CIPHERS += no-ec
+--- ./libs/Makefile.orig	2016-06-20 16:35:50.070816270 +0300
++++ ./libs/Makefile	2016-06-20 16:37:20.723068978 +0300
+@@ -27,6 +27,7 @@
+ LIBS_INCLUDE_LIBICONV=n
+ LIBS_INCLUDE_LIBUSB_0=n
+ LIBS_INCLUDE_LIBUSB_1=n
++LIBS_INCLUDE_LIBEVENT=n
+ LIBS_INCLUDE_MEDIA=n
+ STORAGE_ENABLED=n
+ 
+@@ -63,6 +64,7 @@
+ ifeq ($(STORAGE_ENABLED),y)
+ ifeq ($(CONFIG_FIRMWARE_INCLUDE_TRANSMISSION),y)
+ LIBS_INCLUDE_LIBSSL=y
++LIBS_INCLUDE_LIBEVENT=y
+ endif
+ ifeq ($(CONFIG_FIRMWARE_INCLUDE_ARIA),y)
+ LIBS_INCLUDE_LIBSSL=y
+@@ -89,12 +91,18 @@
+ LIBS_INCLUDE_LIBLZO=y
+ endif
+ 
++ifeq ($(CONFIG_FIRMWARE_INCLUDE_TOR),y)
++LIBS_INCLUDE_LIBSSL=y
++LIBS_INCLUDE_LIBEVENT=y
++endif
++
+ dir_y						+= libz
+ dir_$(LIBS_INCLUDE_LIBLZO)			+= liblzo
+ dir_$(LIBS_INCLUDE_LIBICONV)			+= libiconv
+ dir_$(LIBS_INCLUDE_LIBSSL)			+= libssl
+ dir_$(LIBS_INCLUDE_LIBUSB_0)			+= libusb
+ dir_$(LIBS_INCLUDE_LIBUSB_1)			+= libusb-1.0
++dir_$(LIBS_INCLUDE_LIBEVENT)			+= libevent
+ dir_y						+= libnfnetlink
+ 
+ # ipset shared libs
+@@ -115,11 +123,16 @@
+ 
+ # transmission shared libs
+ dir_$(CONFIG_FIRMWARE_INCLUDE_TRANSMISSION)	+= libcurl
+-dir_$(CONFIG_FIRMWARE_INCLUDE_TRANSMISSION)	+= libevent
+ 
+ # aria2 shared libs
+ dir_$(CONFIG_FIRMWARE_INCLUDE_ARIA)		+= libxml2
+ 
++# privoxy shared libs
++dir_$(CONFIG_FIRMWARE_INCLUDE_PRIVOXY)	+= libpcre
++
++# dnscrypt extra libs
++dir_$(CONFIG_FIRMWARE_INCLUDE_DNSCRYPT)	+= libsodium
++
+ all:
+ 	for i in $(dir_y) ; do \
+ 		[ -d $$i ] && \
+--- ./user/httpd/common.h.orig	2016-06-20 16:35:50.774810466 +0300
++++ ./user/httpd/common.h	2016-06-20 16:37:20.723068978 +0300
+@@ -85,6 +85,9 @@
+ #define EVM_RESTART_ITUNES		(1ULL << 40)
+ #define EVM_RESTART_TRMD		(1ULL << 41)
+ #define EVM_RESTART_ARIA		(1ULL << 42)
++#define EVM_RESTART_TOR			(1ULL << 43)
++#define EVM_RESTART_PRIVOXY		(1ULL << 44)
++#define EVM_RESTART_DNSCRYPT	(1ULL << 45)
+ #define EVM_RESTART_REBOOT		(1ULL << 62)
+ 
+ #define EVM_BLOCK_UNSAFE		(1ULL << 63) /* special case */
+@@ -136,6 +139,9 @@
+ #define EVT_RESTART_ITUNES		2
+ #define EVT_RESTART_TRMD		3
+ #define EVT_RESTART_ARIA		3
++#define EVT_RESTART_TOR			1
++#define EVT_RESTART_PRIVOXY		1
++#define EVT_RESTART_DNSCRYPT	1
+ #define EVT_RESTART_REBOOT		40
+ 
+ struct variable
+--- ./user/httpd/httpd.h.orig	2016-06-20 16:35:50.804810219 +0300
++++ ./user/httpd/httpd.h	2016-06-20 16:37:20.723068978 +0300
+@@ -33,6 +33,9 @@
+ #define STORAGE_DNSMASQ_DIR	"/etc/storage/dnsmasq"
+ #define STORAGE_SCRIPTS_DIR	"/etc/storage"
+ #define STORAGE_CRONTAB_DIR	"/etc/storage/cron/crontabs"
++#define STORAGE_TORCONF_DIR	"/etc/storage/tor"
++#define STORAGE_PRIVOXY_DIR	"/etc/storage/privoxy"
++ 
+ 
+ #define PROFILE_FIFO_UPLOAD	"/tmp/settings_u.prf"
+ #define PROFILE_FIFO_DOWNLOAD	"/tmp/settings_d.prf"
+--- ./user/httpd/variables.c.orig	2016-06-20 16:35:50.827810029 +0300
++++ ./user/httpd/variables.c	2016-06-20 16:37:20.723068978 +0300
+@@ -505,6 +505,26 @@
+ #endif
+ 			{"telnetd", "", NULL, EVM_RESTART_TELNETD},
+ 			{"sshd_enable", "", NULL, EVM_RESTART_SSHD},
++#if defined(APP_TOR)
++			{"tor_enable", "", NULL, EVM_RESTART_TOR},
++			{"torconf.torrc", "File", NULL, EVM_RESTART_TOR|EVM_BLOCK_UNSAFE},
++#endif
++#if defined(APP_PRIVOXY)
++			{"privoxy_enable", "", NULL, EVM_RESTART_PRIVOXY},
++			{"privoxy.config", "File", NULL, EVM_RESTART_PRIVOXY|EVM_BLOCK_UNSAFE},
++			{"privoxy.user.action", "File", NULL, EVM_RESTART_PRIVOXY|EVM_BLOCK_UNSAFE},
++			{"privoxy.user.filter", "File", NULL, EVM_RESTART_PRIVOXY|EVM_BLOCK_UNSAFE},
++			{"privoxy.user.trust", "File", NULL, EVM_RESTART_PRIVOXY|EVM_BLOCK_UNSAFE},
++#endif
++#if defined(APP_DNSCRYPT)
++			{"dnscrypt_enable", "", NULL, EVM_RESTART_DNSCRYPT},
++			{"dnscrypt_resolver", "", NULL, EVM_RESTART_DNSCRYPT},
++			{"dnscrypt_ipaddr", "", NULL, EVM_RESTART_DNSCRYPT},
++			{"dnscrypt_port", "", NULL, EVM_RESTART_DNSCRYPT},
++#endif
++#if defined (SUPPORT_WPAD)
++			{"scripts.wpad.dat", "File", NULL, EVM_BLOCK_UNSAFE},
++#endif
+ 			{"wins_enable", "", NULL, EVM_RESTART_WINS|EVM_REAPPLY_VPNSVR},
+ 			{"lltd_enable", "", NULL, EVM_RESTART_LLTD},
+ 			{"adsc_enable", "", NULL, EVM_RESTART_ADSC},
+@@ -879,6 +899,15 @@
+ 		{EVM_RESTART_VPNCLI,		EVT_RESTART_VPNCLI,		RCN_RESTART_VPNCLI,	EVM_RESTART_FIREWALL},
+ 		{EVM_RESTART_HTTPD,		EVT_RESTART_HTTPD,		RCN_RESTART_HTTPD,	EVM_RESTART_FIREWALL},
+ 		{EVM_RESTART_SSHD,		EVT_RESTART_SSHD,		RCN_RESTART_SSHD,	EVM_RESTART_FIREWALL},
++#if defined(APP_TOR)
++		{EVM_RESTART_TOR,		EVT_RESTART_TOR,		RCN_RESTART_TOR,	EVM_RESTART_FIREWALL},
++#endif
++#if defined(APP_PRIVOXY)
++		{EVM_RESTART_PRIVOXY,		EVT_RESTART_PRIVOXY,		RCN_RESTART_PRIVOXY,	EVM_RESTART_FIREWALL},
++#endif
++#if defined(APP_DNSCRYPT)
++		{EVM_RESTART_DNSCRYPT,		EVT_RESTART_DNSCRYPT,		RCN_RESTART_DNSCRYPT,	EVM_RESTART_FIREWALL},
++#endif
+ 		{EVM_RESTART_TELNETD,		EVT_RESTART_TELNETD,		RCN_RESTART_TELNETD,	0},
+ #if defined(APP_SMBD) || defined(APP_NMBD)
+ 		{EVM_RESTART_WINS,		EVT_RESTART_WINS,		RCN_RESTART_WINS,	EVM_RESTART_DHCPD|EVM_RESTART_NMBD|EVM_REAPPLY_VPNSVR},
+--- ./user/httpd/web_ex.c.orig	2016-06-20 16:35:50.849809847 +0300
++++ ./user/httpd/web_ex.c	2016-06-20 16:37:20.724068970 +0300
+@@ -713,6 +713,10 @@
+ 		snprintf(filename, sizeof(filename), "%s/%s", STORAGE_SCRIPTS_DIR, file+8);
+ 	else if (strncmp(file, "crontab.", 8)==0)
+ 		snprintf(filename, sizeof(filename), "%s/%s", STORAGE_CRONTAB_DIR, nvram_safe_get("http_username"));
++	else if (strncmp(file, "torconf.", 8)==0)
++		snprintf(filename, sizeof(filename), "%s/%s", STORAGE_TORCONF_DIR, file+8);
++	else if (strncmp(file, "privoxy.", 8)==0)
++		snprintf(filename, sizeof(filename), "%s/%s", STORAGE_PRIVOXY_DIR, file+8);
+ 	else
+ 		snprintf(filename, sizeof(filename), "%s/%s", "/tmp", file);
+ 
+@@ -912,6 +916,18 @@
+ 					restart_needed_bits |= event_mask;
+ 			}
+ #endif
++#if defined(APP_TOR)
++			else if (!strncmp(v->name, "torconf.", 8)) {
++				if (write_textarea_to_file(value, STORAGE_TORCONF_DIR, file_name))
++					restart_needed_bits |= event_mask;
++			}
++#endif
++#if defined(APP_PRIVOXY)
++			else if (!strncmp(v->name, "privoxy.", 8)) {
++				if (write_textarea_to_file(value, STORAGE_PRIVOXY_DIR, file_name))
++					restart_needed_bits |= event_mask;
++			}
++#endif
+ 			continue;
+ 		}
+ 		
+@@ -2062,6 +2078,26 @@
+ #else
+ 	int found_app_sshd = 0;
+ #endif
++#if defined(APP_TOR)
++	int found_app_tor = 1;
++#else
++	int found_app_tor = 0;
++#endif
++#if defined(APP_PRIVOXY)
++	int found_app_privoxy = 1;
++#else
++	int found_app_privoxy = 0;
++#endif
++#if defined(APP_DNSCRYPT)
++	int found_app_dnscrypt = 1;
++#else
++	int found_app_dnscrypt = 0;
++#endif
++#if defined(SUPPORT_WPAD)
++	int found_support_wpad = 1;
++#else
++	int found_support_wpad = 0;
++#endif
+ #if defined(APP_XUPNPD)
+ 	int found_app_xupnpd = 1;
+ #else
+@@ -2188,6 +2224,10 @@
+ 		"function found_srv_u2ec() { return %d;}\n"
+ 		"function found_srv_lprd() { return %d;}\n"
+ 		"function found_app_sshd() { return %d;}\n"
++		"function found_app_tor() { return %d;}\n"
++		"function found_app_privoxy() { return %d;}\n"
++		"function found_app_dnscrypt() { return %d;}\n"
++		"function found_support_wpad() { return %d;}\n"
+ 		"function found_app_xupnpd() { return %d;}\n",
+ 		found_utl_hdparm,
+ 		found_app_ovpn,
+@@ -2203,6 +2243,10 @@
+ 		found_srv_u2ec,
+ 		found_srv_lprd,
+ 		found_app_sshd,
++		found_app_tor,
++		found_app_privoxy,
++		found_app_dnscrypt,
++		found_support_wpad,
+ 		found_app_xupnpd
+ 	);
+ 
+@@ -3545,6 +3589,16 @@
+ 	{ "restore_nv.cgi*", "text/html", no_cache_IE, do_restore_nv_post, do_restore_nv_cgi, 1 },
+ 	{ "restore_st.cgi*", "text/html", no_cache_IE, do_restore_st_post, do_restore_st_cgi, 1 },
+ 
++#if defined(APP_DNSCRYPT)
++	/* DNSCrypt proxy resolvers file */
++	{ "**.csv", "text/csv", NULL, NULL, do_file, 0 }, // qwe
++#endif
++#if defined(SUPPORT_WPAD)
++	/* Support wpad.dat file */
++	{ "wpad.da", "application/x-ns-proxy-autoconfig", no_cache_IE, NULL, do_file, 0 }, // qwe
++	{ "wpad.dat", "application/x-ns-proxy-autoconfig", no_cache_IE, NULL, do_file, 0 }, // qwe
++	{ "proxy.pac", "application/x-ns-proxy-autoconfig", no_cache_IE, NULL, do_file, 0 }, // qwe
++#endif
+ 	{ NULL, NULL, NULL, NULL, NULL, 0 }
+ };
+ 
+--- ./user/Makefile.orig	2016-06-20 16:35:50.719810919 +0300
++++ ./user/Makefile	2016-06-20 16:37:20.724068970 +0300
+@@ -111,6 +111,9 @@
+ dir_$(CONFIG_FIRMWARE_INCLUDE_XUPNPD)		+= xupnpd
+ dir_$(CONFIG_FIRMWARE_INCLUDE_TCPDUMP)		+= tcpdump
+ dir_$(SAMBA_ENABLED)				+= samba3
++dir_$(CONFIG_FIRMWARE_INCLUDE_TOR)	+= tor
++dir_$(CONFIG_FIRMWARE_INCLUDE_PRIVOXY)	+= privoxy
++dir_$(CONFIG_FIRMWARE_INCLUDE_DNSCRYPT)	+= dnscrypt-proxy
+ 
+ ifdef CONFIG_BLK_DEV_SD
+ dir_$(CONFIG_FIRMWARE_INCLUDE_HDPARM)		+= hdparm
+--- ./user/rc/rc.c.orig	2016-06-20 16:35:50.925809221 +0300
++++ ./user/rc/rc.c	2016-06-20 16:37:20.724068970 +0300
+@@ -1183,6 +1183,24 @@
+ 			restart_sshd();
+ 		}
+ #endif
++#if defined(APP_TOR)
++		else if (strcmp(entry->d_name, RCN_RESTART_TOR) == 0)
++		{
++			restart_tor();
++		}
++#endif
++#if defined(APP_PRIVOXY)
++		else if (strcmp(entry->d_name, RCN_RESTART_PRIVOXY) == 0)
++		{
++			restart_privoxy();
++		}
++#endif
++#if defined(APP_DNSCRYPT)
++		else if (strcmp(entry->d_name, RCN_RESTART_DNSCRYPT) == 0)
++		{
++			restart_dnscrypt();
++		}
++#endif
+ #if defined(APP_SMBD) || defined(APP_NMBD)
+ 		else if (strcmp(entry->d_name, RCN_RESTART_NMBD) == 0)
+ 		{
+--- ./user/rc/rc.h.orig	2016-06-20 16:35:50.946809048 +0300
++++ ./user/rc/rc.h	2016-06-20 16:37:20.724068970 +0300
+@@ -64,6 +64,8 @@
+ #define VPN_CLIENT_PPPD_OPTIONS		"/tmp/ppp/options.vpnc"
+ #define VPN_CLIENT_UPDOWN_SCRIPT	"/etc/storage/vpnc_server_script.sh"
+ 
++#define WPAD_DAT_SCRIPT				"/etc/storage/wpad.dat"
++
+ #define IPT_CHAIN_NAME_VPN_LIST		"vpnlist"
+ #define IPT_CHAIN_NAME_MAC_LIST		"maclist"
+ #define IPT_CHAIN_NAME_URL_LIST		"urllist"
+@@ -513,6 +515,25 @@
+ void stop_services_lan_wan(void);
+ void stop_misc(void);
+ 
++#if defined(APP_TOR)
++int is_tor_run(void);
++void stop_tor(void);
++void run_tor(void);
++void restart_tor(void);
++#endif
++#if defined(APP_PRIVOXY)
++int is_privoxy_run(void);
++void stop_privoxy(void);
++void run_privoxy(void);
++void restart_privoxy(void);
++#endif
++#if defined(APP_DNSCRYPT)
++int is_dnscrypt_run(void);
++void stop_dnscrypt(void);
++void run_dnscrypt(void);
++void restart_dnscrypt(void);
++#endif
++
+ /* services_ex.c */
+ int fill_dnsmasq_servers(void);
+ int is_dns_dhcpd_run(void);
+--- ./user/rc/services.c.orig	2016-06-20 16:35:50.964808900 +0300
++++ ./user/rc/services.c	2016-06-20 16:37:20.724068970 +0300
+@@ -233,6 +233,127 @@
+ }
+ #endif
+ 
++#if defined(APP_TOR)
++int
++is_tor_run(void)
++{
++	if (check_if_file_exist("/usr/sbin/tor"))
++	{
++		if (pids("tor"))
++			return 1;
++	}
++	
++	return 0;
++}
++
++void
++stop_tor(void)
++{
++	eval("/usr/bin/tor.sh", "stop");
++}
++
++void
++start_tor(void)
++{
++	int tor_mode = nvram_get_int("tor_enable");
++
++	if (tor_mode == 1)
++		eval("/usr/bin/tor.sh", "start");
++}
++
++void
++restart_tor(void)
++{
++	int is_run_before = is_tor_run();
++	int is_run_after;
++
++	stop_tor();
++	start_tor();
++
++	is_run_after = is_tor_run();
++}
++#endif
++#if defined(APP_PRIVOXY)
++int
++is_privoxy_run(void)
++{
++	if (check_if_file_exist("/usr/sbin/privoxy"))
++	{
++		if (pids("privoxy"))
++			return 1;
++	}
++	
++	return 0;
++}
++
++void
++stop_privoxy(void)
++{
++	eval("/usr/bin/privoxy.sh", "stop");
++}
++
++void
++start_privoxy(void)
++{
++	int privoxy_mode = nvram_get_int("privoxy_enable");
++
++	if (privoxy_mode == 1)
++		eval("/usr/bin/privoxy.sh", "start");
++}
++
++void
++restart_privoxy(void)
++{
++	int is_run_before = is_privoxy_run();
++	int is_run_after;
++
++	stop_privoxy();
++	start_privoxy();
++
++	is_run_after = is_privoxy_run();
++}
++#endif
++#if defined(APP_DNSCRYPT)
++int
++is_dnscrypt_run(void)
++{
++	if (check_if_file_exist("/usr/sbin/dnscrypt-proxy"))
++	{
++		if (pids("dnscrypt-proxy"))
++			return 1;
++	}
++	
++	return 0;
++}
++
++void
++stop_dnscrypt(void)
++{
++	eval("/usr/bin/dnscrypt-proxy.sh", "stop");
++}
++
++void
++start_dnscrypt(void)
++{
++	int dnscrypt_mode = nvram_get_int("dnscrypt_enable");
++
++	if (dnscrypt_mode > 0)
++		eval("/usr/bin/dnscrypt-proxy.sh", "start");
++}
++
++void
++restart_dnscrypt(void)
++{
++	int is_run_before = is_dnscrypt_run();
++	int is_run_after;
++
++	stop_dnscrypt();
++	start_dnscrypt();
++
++	is_run_after = is_dnscrypt_run();
++}
++#endif
++
+ void
+ start_httpd(int restart_fw)
+ {
+@@ -412,6 +533,15 @@
+ #if defined(APP_SSHD)
+ 	start_sshd();
+ #endif
++#if defined(APP_TOR)
++	start_tor();
++#endif
++#if defined(APP_PRIVOXY)
++	start_privoxy();
++#endif
++#if defined(APP_DNSCRYPT)
++	start_dnscrypt();
++#endif
+ 	start_vpn_server();
+ 	start_watchdog();
+ 	start_infosvr();
+@@ -460,6 +590,15 @@
+ 	stop_u2ec();
+ #endif
+ #endif
++#if defined(APP_TOR)
++	stop_tor();
++#endif
++#if defined(APP_PRIVOXY)
++	stop_privoxy();
++#endif
++#if defined(APP_DNSCRYPT)
++	stop_dnscrypt();
++#endif
+ 	stop_networkmap();
+ 	stop_lltd();
+ 	stop_detect_internet();
+--- ./user/scripts/mtd_storage.sh.orig	2017-05-23 12:38:23.246845398 +0300
++++ ./user/scripts/mtd_storage.sh	2017-05-23 12:39:26.509377457 +0300
+@@ -203,6 +203,7 @@
+ 	script_vpnsc="$dir_storage/vpns_client_script.sh"
+ 	script_vpncs="$dir_storage/vpnc_server_script.sh"
+ 	script_ezbtn="$dir_storage/ez_buttons_script.sh"
++	script_wpad="$dir_storage/wpad.dat"
+ 
+ 	user_hosts="$dir_dnsmasq/hosts"
+ 	user_dnsmasq_conf="$dir_dnsmasq/dnsmasq.conf"
+@@ -415,6 +416,24 @@
+ 		chmod 755 "$script_ezbtn"
+ 	fi
+ 
++	# create wpad.dat script
++	if [ -L "/www/wpad.dat" ] ; then
++		if [ ! -f "$script_wpad" ] ; then
++			cat > "$script_wpad" <<EOF
++/*
++   Web Proxy Automatic Discovery (WPAD) example script
++*/
++
++function FindProxyForURL(url, host)
++{
++  if (dnsDomainIs(host, "onion")) return "SOCKS 192.168.1.1:9050";
++  return "DIRECT";
++}
++EOF
++		chmod 644 "$script_wpad"
++		fi
++	fi
++
+ 	# create user dnsmasq.conf
+ 	[ ! -d "$dir_dnsmasq" ] && mkdir -p -m 755 "$dir_dnsmasq"
+ 	for i in dnsmasq.conf hosts ; do
+--- ./user/shared/cflags.mk.orig	2016-06-20 16:35:50.999808611 +0300
++++ ./user/shared/cflags.mk	2016-06-20 16:37:20.725068961 +0300
+@@ -174,6 +174,22 @@
+ CFLAGS += -DAPP_RPL2TP
+ endif
+ 
++ifeq ($(CONFIG_FIRMWARE_INCLUDE_TOR),y)
++CFLAGS += -DAPP_TOR
++endif
++
++ifeq ($(CONFIG_FIRMWARE_INCLUDE_PRIVOXY),y)
++CFLAGS += -DAPP_PRIVOXY
++endif
++
++ifeq ($(CONFIG_FIRMWARE_INCLUDE_DNSCRYPT),y)
++CFLAGS += -DAPP_DNSCRYPT
++endif
++
++ifeq ($(CONFIG_FIRMWARE_INCLUDE_WPAD),y)
++CFLAGS += -DSUPPORT_WPAD
++endif
++
+ ifeq ($(CONFIG_FIRMWARE_INCLUDE_DDNS_SSL),y)
+ CFLAGS += -DSUPPORT_DDNS_SSL
+ endif
+--- ./user/shared/defaults.c.orig	2016-06-20 16:35:50.999808611 +0300
++++ ./user/shared/defaults.c	2016-06-20 16:37:20.725068961 +0300
+@@ -578,6 +578,12 @@
+ 	{ "telnetd", "1" },
+ 	{ "sshd_enable", "0" },
+ 	{ "wins_enable", "0" },
++	{ "tor_enable", "0" },
++	{ "privoxy_enable", "0" },
++	{ "dnscrypt_enable", "0" },
++	{ "dnscrypt_resolver", "cisco" },
++	{ "dnscrypt_ipaddr", "127.0.0.1" },
++	{ "dnscrypt_port", "65053" },
+ 	{ "lltd_enable", "1" },
+ 	{ "adsc_enable", "0" },
+ 	{ "crond_enable", "0" },
+--- ./user/shared/notify_rc.h.orig	2016-06-20 16:35:51.031808347 +0300
++++ ./user/shared/notify_rc.h	2016-06-20 16:37:20.725068961 +0300
+@@ -40,6 +40,9 @@
+ #define RCN_RESTART_HTTPD		"restart_httpd"
+ #define RCN_RESTART_TELNETD		"restart_telnetd"
+ #define RCN_RESTART_SSHD		"restart_sshd"
++#define RCN_RESTART_TOR			"restart_tor"
++#define RCN_RESTART_PRIVOXY		"restart_privoxy"
++#define RCN_RESTART_DNSCRYPT	"restart_dnscrypt"
+ #define RCN_RESTART_WINS		"restart_wins"
+ #define RCN_RESTART_LLTD		"restart_lltd"
+ #define RCN_RESTART_ADSC		"restart_adsc"
+--- ./user/www/Makefile.orig	2017-05-23 12:38:23.404844229 +0300
++++ ./user/www/Makefile	2017-05-23 12:39:26.510377450 +0300
+@@ -25,6 +25,12 @@
+ 	echo "ASUSTeK" > $(ROMFS_DIR)/www/httpd_check.htm
+ 	cd $(ROMFS_DIR)/www && ln -sf /opt/share/www/custom custom
+ 	cp dict/EN.header $(ROMFS_DIR)/www
++	cd $(ROMFS_DIR)/www && ln -sf /usr/share/dnscrypt-proxy/dnscrypt-resolvers.csv dnscrypt-resolvers.csv
++ifeq ($(CONFIG_FIRMWARE_INCLUDE_WPAD),y)
++	ln -s /etc/storage/wpad.dat $(ROMFS_DIR)/www/wpad.dat
++	ln -s /etc/storage/wpad.dat $(ROMFS_DIR)/www/wpad.da
++	ln -s /etc/storage/wpad.dat $(ROMFS_DIR)/www/proxy.pac
++endif
+ ifeq ($(CONFIG_FIRMWARE_INCLUDE_LANG_BR),y)
+ 	echo "LANG_BR=Brazil" >> $(ROMFS_DIR)/www/EN.header
+ 	cp dict/BR.dict $(ROMFS_DIR)/www
+--- ./user/www/dict/EN.footer.orig	2016-06-20 16:35:51.074807993 +0300
++++ ./user/www/dict/EN.footer	2016-06-20 16:37:20.725068961 +0300
+@@ -209,12 +209,22 @@
+ Adm_System_logf_item2=Last 100 lines
+ Adm_Svc_desc=Control of various system services.
+ Adm_Svc_wins=WINS Service?
++Adm_Svc_tor=TOR proxy anonymizer?
++Adm_Svc_privoxy=Privoxy filtering proxy?
++Adm_Svc_dnscrypt=DNSCrypt proxy:
++Adm_Svc_dnscrypt_desc=Prevents DNS spoofing.<br /><br />integrated with dnsmasq - dnsmask forward DNS queries to DNSCrypt proxy<br /><br />integrated with iptables - All outgoing DNS queries are redirected to DNSCrypt proxy.
++Adm_Svc_dnscrypt_resolver=Resolver:
++Adm_Svc_dnscrypt_ipaddr=Local IP address:
++Adm_Svc_dnscrypt_port=Local port:
++Adm_Svc_dnscrypt_list=List
++Adm_Svc_dnscrypt_all=All IP addresses
+ Adm_Svc_lltd=LLTD (Link Layer Topology Discovery)?
+ Adm_Svc_adsc=ASUS Info Discovery Service?
+ Adm_Svc_crond=Cron Daemon (Scheduler)?
+ Adm_Svc_crontabs=Scheduler tasks (Crontab)
+ Adm_System_webs=HTTP Web Server
+ Adm_System_term=Terminal Services
++Adm_System_anon=Anonymity and content filtering
+ Adm_System_misc=Miscellaneous Services
+ Adm_System_telnetd=Enable Telnet Server?
+ Adm_System_sshd=Enable SSH Server?
+@@ -1278,6 +1288,7 @@
+ RouterConfig_GWStaticIP_itemname=Network or Host IP
+ RouterConfig_GWStaticMask_itemname=Netmask
+ RouterConfig_GWStaticGW_itemname=Gateway
++LANHostConfig_WPAD=Web Proxy Automatic Discovery (WPAD)
+ LANHostConfig_display1_sectionname=LAN IP Settings
+ LANHostConfig_display1_sectiondesc=Configure the LAN IP of ZVMODELVZ. The DHCP Server dynamically changes the IP pool when you change the LAN IP.
+ LANHostConfig_display2_sectiondesc=Configure the LAN IP of ZVMODELVZ in AP mode.
+--- ./user/www/dict/RU.dict.orig	2016-06-20 16:35:51.075807985 +0300
++++ ./user/www/dict/RU.dict	2016-06-20 16:37:20.726068953 +0300
+@@ -223,12 +223,22 @@
+ Adm_System_logf_item2=Последние 100 строк
+ Adm_Svc_desc=Управление различными сервисами маршрутизатора.
+ Adm_Svc_wins=Сервис WINS?
++Adm_Svc_tor=Анонимизирующий делегирующий сервер TOR?
++Adm_Svc_privoxy=Фильтрующий делегирующий сервер Privoxy?
++Adm_Svc_dnscrypt=Сервис DNSCrypt proxy:
++Adm_Svc_dnscrypt_desc=Предотвращает подмену DNS.<br /><br />integrated with dnsmasq - dnsmasq посылает DNS запросы через DNSCrypt proxy.<br /><br />integrated with iptables - Все исходящие DNS запросы перенаправляются на DNSCrypt proxy.
++Adm_Svc_dnscrypt_resolver=Резолвер:
++Adm_Svc_dnscrypt_ipaddr=Локальный IP адрес:
++Adm_Svc_dnscrypt_port=Локальный порт:
++Adm_Svc_dnscrypt_list=Список
++Adm_Svc_dnscrypt_all=Все IP адреса
+ Adm_Svc_lltd=Сервис LLTD (Link Layer Topology Discovery)?
+ Adm_Svc_adsc=Сервис ASUS Info Discovery?
+ Adm_Svc_crond=Сервис Cron (планировщик)?
+ Adm_Svc_crontabs=Задания планировщика (Crontab)
+ Adm_System_webs=HTTP веб-сервер
+ Adm_System_term=Терминальные сервисы
++Adm_System_anon=Анонимность и фильтрация контента
+ Adm_System_misc=Прочие сервисы
+ Adm_System_telnetd=Включить Telnet-сервер?
+ Adm_System_sshd=Включить SSH-сервер?
+@@ -1292,6 +1302,7 @@
+ RouterConfig_GWStaticIP_itemname=IP-адрес сети или хоста
+ RouterConfig_GWStaticMask_itemname=Сетевая маска
+ RouterConfig_GWStaticGW_itemname=Шлюз
++LANHostConfig_WPAD=Автоматическая конфигурация делегирующих серверов (WPAD)
+ LANHostConfig_display1_sectionname=Настройка LAN IP-адреса
+ LANHostConfig_display1_sectiondesc=Настройка LAN IP-адреса маршрутизатора. DHCP-сервер динамически изменяет пул IP-адресов при изменении IP-адреса LAN.
+ LANHostConfig_display2_sectiondesc=Настройка LAN IP-адреса маршрутизатора в режиме точки доступа (AP).
+--- ./user/www/n56u_ribbon_fixed/Advanced_DHCP_Content.asp.orig	2017-05-23 12:38:23.420844111 +0300
++++ ./user/www/n56u_ribbon_fixed/Advanced_DHCP_Content.asp	2017-05-23 12:39:26.511377442 +0300
+@@ -63,6 +63,11 @@
+ 		showhide_div('row_dservers', 0);
+ 		showhide_div('row_hosts', 0);
+ 	}
++	if(!found_support_wpad()){
++		showhide_div('row_wpad', 0);
++	}else{
++		if(get_ap_mode()) showhide_div('row_wpad', 0);
++	}
+ 
+ 	if((inet_network(document.form.lan_ipaddr.value)>=inet_network(document.form.dhcp_start.value))&&
+ 	   (inet_network(document.form.lan_ipaddr.value)<=inet_network(document.form.dhcp_end.value)))
+@@ -528,6 +533,14 @@
+                                                 </div>
+                                             </td>
+                                         </tr>
++                                        <tr id="row_wpad">
++                                            <td colspan="2" style="padding-bottom: 0px;">
++                                                <a href="javascript:spoiler_toggle('spoiler_wpad')"><span><#LANHostConfig_WPAD#> "wpad.dat"</span></a>
++                                                <div id="spoiler_wpad" style="display:none;">
++                                                    <textarea rows="16" wrap="off" spellcheck="false" maxlength="65536" class="span12" name="scripts.wpad.dat" style="font-family:'Courier New'; font-size:12px;"><% nvram_dump("scripts.wpad.dat",""); %></textarea>
++                                                </div>
++                                            </td>
++                                        </tr>
+                                     </table>
+ 
+                                     <table width="100%" align="center" cellpadding="4" cellspacing="0" class="table">
+--- ./user/www/n56u_ribbon_fixed/Advanced_Services_Content.asp.orig	2016-06-20 16:35:51.091807853 +0300
++++ ./user/www/n56u_ribbon_fixed/Advanced_Services_Content.asp	2016-06-20 16:37:20.726068953 +0300
+@@ -30,7 +30,8 @@
+ 	init_itoggle('adsc_enable');
+ 	init_itoggle('crond_enable', change_crond_enabled);
+ 	init_itoggle('watchdog_cpu');
+-	
++	init_itoggle('tor_enable', change_tor_enabled);
++	init_itoggle('privoxy_enable', change_privoxy_enabled);
+ });
+ 
+ </script>
+@@ -68,6 +69,33 @@
+ 		http_proto_change();
+ 	}
+ 	change_crond_enabled();
++	
++	if(found_app_tor() || found_app_privoxy() || found_app_dnscrypt()){
++		showhide_div('tbl_anon', 1);
++	}
++
++	if(!found_app_tor()){
++		showhide_div('row_tor', 0);
++		showhide_div('row_tor_conf', 0);
++	}else
++		change_tor_enabled();
++		
++	if(!found_app_privoxy()){
++		showhide_div('row_privoxy', 0);
++		showhide_div('row_privoxy_conf', 0);
++		showhide_div('row_privoxy_action', 0);
++		showhide_div('row_privoxy_filter', 0);
++		showhide_div('row_privoxy_trust', 0);
++	}else
++		change_privoxy_enabled();
++		
++	if(!found_app_dnscrypt()){
++		showhide_div('row_dnscrypt', 0);
++		showhide_div('row_dnscrypt_resolver', 0);
++		showhide_div('row_dnscrypt_ipaddr', 0);
++		showhide_div('row_dnscrypt_port', 0);
++	}else
++		dnscrypt_mode_change();
+ }
+ 
+ function applyRule(){
+@@ -80,6 +108,27 @@
+ 		
+ 		document.form.submit();
+ 	}
++
++	if(!found_app_tor()){
++		showhide_div('row_tor', 0);
++		showhide_div('row_tor_conf', 0);
++	}
++
++	if(!found_app_privoxy()){
++		showhide_div('row_privoxy', 0);
++		showhide_div('row_privoxy_conf', 0);
++		showhide_div('row_privoxy_action', 0);
++		showhide_div('row_privoxy_filter', 0);
++		showhide_div('row_privoxy_trust', 0);
++	}
++
++	if(!found_app_dnscrypt()){
++		showhide_div('row_dnscrypt', 0);
++		showhide_div('row_dnscrypt_resolver', 0);
++		showhide_div('row_dnscrypt_ipaddr', 0);
++		showhide_div('row_dnscrypt_port', 0);
++	}
++
+ }
+ 
+ function validForm(){
+@@ -127,6 +176,17 @@
+ 	inputCtrl(document.form['scripts.authorized_keys'], v);
+ }
+ 
++function textarea_tor_enabled(v){
++	inputCtrl(document.form['torconf.torrc'], v);
++}
++
++function textarea_privoxy_enabled(v){
++	inputCtrl(document.form['privoxy.config'], v);
++	inputCtrl(document.form['privoxy.user.action'], v);
++	inputCtrl(document.form['privoxy.user.filter'], v);
++	inputCtrl(document.form['privoxy.user.trust'], v);
++}
++
+ function textarea_crond_enabled(v){
+ 	inputCtrl(document.form['crontab.login'], v);
+ }
+@@ -217,6 +277,33 @@
+ 	showhide_div('row_smb_lmb', v);
+ }
+ 
++function change_tor_enabled(){
++	var v = document.form.tor_enable[0].checked;
++	showhide_div('row_tor_conf', v);
++	if (!login_safe())
++		v = 0;
++	textarea_tor_enabled(v);
++}
++
++function change_privoxy_enabled(){
++	var v = document.form.privoxy_enable[0].checked;
++	showhide_div('row_privoxy_conf', v);
++	showhide_div('row_privoxy_action', v);
++	showhide_div('row_privoxy_filter', v);
++	showhide_div('row_privoxy_trust', v);
++	if (!login_safe())
++		v = 0;
++	textarea_privoxy_enabled(v);
++}
++
++function dnscrypt_mode_change(){
++	var mode = document.form.dnscrypt_enable.value;
++	var v = (mode != "0") ? 1 : 0;
++	showhide_div('row_dnscrypt_resolver', v);
++	showhide_div('row_dnscrypt_ipaddr', v);
++	showhide_div('row_dnscrypt_port', v);
++}
++
+ function change_crond_enabled(){
+ 	var v = document.form.crond_enable[0].checked;
+ 	showhide_div('row_crontabs', v);
+@@ -464,6 +551,119 @@
+                                         </tr>
+                                     </table>
+ 
++                                    <table width="100%" cellpadding="4" cellspacing="0" class="table" id="tbl_anon" style="display:none">
++                                        <tr>
++                                            <th colspan="2" style="background-color: #E3E3E3;"><#Adm_System_anon#></th>
++                                        </tr>
++                                        <tr id="row_tor">
++                                            <th width="50%"><#Adm_Svc_tor#></th>
++                                            <td>
++                                                <div class="main_itoggle">
++                                                    <div id="tor_enable_on_of">
++                                                        <input type="checkbox" id="tor_enable_fake" <% nvram_match_x("", "tor_enable", "1", "value=1 checked"); %><% nvram_match_x("", "tor_enable", "0", "value=0"); %>>
++                                                    </div>
++                                                </div>
++                                                <div style="position: absolute; margin-left: -10000px;">
++                                                    <input type="radio" name="tor_enable" id="tor_enable_1" class="input" value="1" <% nvram_match_x("", "tor_enable", "1", "checked"); %>/><#checkbox_Yes#>
++                                                    <input type="radio" name="tor_enable" id="tor_enable_0" class="input" value="0" <% nvram_match_x("", "tor_enable", "0", "checked"); %>/><#checkbox_No#>
++                                                </div>
++                                            </td>
++                                        </tr>
++										<tr id="row_tor_conf" style="display:none">
++											<td colspan="2">
++												<a href="javascript:spoiler_toggle('spoiler_tor_conf')"><span><#CustomConf#> "torrc"</span></a>
++												<div id="spoiler_tor_conf" style="display:none;">
++													<textarea rows="16" wrap="off" spellcheck="false" maxlength="4096" class="span12" name="torconf.torrc" style="font-family:'Courier New'; font-size:12px;"><% nvram_dump("torconf.torrc",""); %></textarea>
++												</div>
++											</td>
++										</tr>
++                                        <tr id="row_privoxy">
++                                            <th width="50%"><#Adm_Svc_privoxy#></th>
++                                            <td>
++                                                <div class="main_itoggle">
++                                                    <div id="privoxy_enable_on_of">
++                                                        <input type="checkbox" id="privoxy_enable_fake" <% nvram_match_x("", "privoxy_enable", "1", "value=1 checked"); %><% nvram_match_x("", "privoxy_enable", "0", "value=0"); %>>
++                                                    </div>
++                                                </div>
++                                                <div style="position: absolute; margin-left: -10000px;">
++                                                    <input type="radio" name="privoxy_enable" id="privoxy_enable_1" class="input" value="1" <% nvram_match_x("", "privoxy_enable", "1", "checked"); %>/><#checkbox_Yes#>
++                                                    <input type="radio" name="privoxy_enable" id="privoxy_enable_0" class="input" value="0" <% nvram_match_x("", "privoxy_enable", "0", "checked"); %>/><#checkbox_No#>
++                                                </div>
++                                            </td>
++                                        </tr>
++										<tr id="row_privoxy_conf" style="display:none">
++											<td colspan="2">
++												<a href="javascript:spoiler_toggle('spoiler_privoxy_conf')"><span><#CustomConf#> "config"</span></a>
++												<div id="spoiler_privoxy_conf" style="display:none;">
++													<textarea rows="16" wrap="off" spellcheck="false" maxlength="65536" class="span12" name="privoxy.config" style="font-family:'Courier New'; font-size:12px;"><% nvram_dump("privoxy.config",""); %></textarea>
++												</div>
++											</td>
++										</tr>
++										<tr id="row_privoxy_action" style="display:none">
++											<td colspan="2">
++												<a href="javascript:spoiler_toggle('spoiler_privoxy_action')"><span><#CustomConf#> "user.action"</span></a>
++												<div id="spoiler_privoxy_action" style="display:none;">
++													<textarea rows="16" wrap="off" spellcheck="false" maxlength="65536" class="span12" name="privoxy.user.action" style="font-family:'Courier New'; font-size:12px;"><% nvram_dump("privoxy.user.action",""); %></textarea>
++												</div>
++											</td>
++										</tr>
++										<tr id="row_privoxy_filter" style="display:none">
++											<td colspan="2">
++												<a href="javascript:spoiler_toggle('spoiler_privoxy_filter')"><span><#CustomConf#> "user.filter"</span></a>
++												<div id="spoiler_privoxy_filter" style="display:none;">
++													<textarea rows="16" wrap="off" spellcheck="false" maxlength="65536" class="span12" name="privoxy.user.filter" style="font-family:'Courier New'; font-size:12px;"><% nvram_dump("privoxy.user.filter",""); %></textarea>
++												</div>
++											</td>
++										</tr>
++										<tr id="row_privoxy_trust" style="display:none">
++											<td colspan="2">
++												<a href="javascript:spoiler_toggle('spoiler_privoxy_trust')"><span><#CustomConf#> "user.trust"</span></a>
++												<div id="spoiler_privoxy_trust" style="display:none;">
++													<textarea rows="16" wrap="off" spellcheck="false" maxlength="65536" class="span12" name="privoxy.user.trust" style="font-family:'Courier New'; font-size:12px;"><% nvram_dump("privoxy.user.trust",""); %></textarea>
++												</div>
++											</td>
++										</tr>
++                                        <tr id="row_dnscrypt">
++                                            <th width="50%"><a class="help_tooltip" href="javascript:void(0);" onmouseover="openTooltip(this, 25, 1);"><#Adm_Svc_dnscrypt#></a></th>
++                                            <td>
++                                                <select name="dnscrypt_enable" class="input" onchange="dnscrypt_mode_change();">
++                                                    <option value="0" <% nvram_match_x("", "dnscrypt_enable", "0","selected"); %>><#checkbox_No#> (*)</option>
++                                                    <option value="1" <% nvram_match_x("", "dnscrypt_enable", "1","selected"); %>><#checkbox_Yes#></option>
++                                                    <option value="2" <% nvram_match_x("", "dnscrypt_enable", "2","selected"); %>><#checkbox_Yes#> (integrated with dnsmasq)</option>
++                                                    <option value="3" <% nvram_match_x("", "dnscrypt_enable", "3","selected"); %>><#checkbox_Yes#> (integrated with iptables)</option>
++                                                </select>
++                                            </td>
++                                        </tr>
++										<tr id="row_dnscrypt_resolver" style="display:none">
++                                            <th style="text-align: right;"><#Adm_Svc_dnscrypt_resolver#></th>
++                                            <td>
++                                                <input type="text" maxlength="64" size="15" name="dnscrypt_resolver" class="input" value="<% nvram_get_x("", "dnscrypt_resolver"); %>" onkeypress="return is_string(this,event);"/>
++                                                &nbsp;<a href="dnscrypt-resolvers.csv" target="_blank"><span><#Adm_Svc_dnscrypt_list#></span></a>
++                                            </td>
++										</tr>
++										<tr id="row_dnscrypt_ipaddr" style="display:none">
++                                            <th style="text-align: right;"><#Adm_Svc_dnscrypt_ipaddr#></th>
++                                            <td>
++												<select name="dnscrypt_ipaddr" class="input">
++													<option value="127.0.0.1" <% nvram_match_x("", "dnscrypt_ipaddr", "127.0.0.1","selected"); %>>127.0.0.1 (*)</option>
++													<option id="localip" value="<% nvram_get_x("", "lan_ipaddr"); %>"><% nvram_get_x("", "lan_ipaddr"); %></option>
++													<option value="0.0.0.0" <% nvram_match_x("", "dnscrypt_ipaddr", "0.0.0.0","selected"); %>><#Adm_Svc_dnscrypt_all#></option>
++													<script type="text/javascript">
++														if("<% nvram_get_x("", "lan_ipaddr"); %>"=="<% nvram_get_x("", "dnscrypt_ipaddr"); %>")
++															lip=document.getElementById("localip").selected="selected";
++													</script>
++												</select>
++                                            </td>
++										</tr>
++										<tr id="row_dnscrypt_port" style="display:none">
++                                            <th style="text-align: right;"><#Adm_Svc_dnscrypt_port#></th>
++                                            <td>
++                                                <input type="text" maxlength="5" size="15" name="dnscrypt_port" class="input" value="<% nvram_get_x("", "dnscrypt_port"); %>" onkeypress="return is_ipaddrport(this,event);"/>
++                                                &nbsp;<span style="color:#888;">[53..65535]</span>
++                                            </td>
++										</tr>
++                                    </table>
++
+                                     <table width="100%" cellpadding="4" cellspacing="0" class="table">
+                                         <tr>
+                                             <th colspan="2" style="background-color: #E3E3E3;"><#Adm_System_misc#></th>
+@@ -496,6 +696,7 @@
+                                                 </div>
+                                             </td>
+                                         </tr>
++                                        <tr>
+                                             <th><#Adm_Svc_crond#></th>
+                                             <td>
+                                                 <div class="main_itoggle">
+--- ./user/www/n56u_ribbon_fixed/help.js.orig	2016-06-20 16:35:51.105807737 +0300
++++ ./user/www/n56u_ribbon_fixed/help.js	2016-06-20 16:37:20.726068953 +0300
+@@ -174,6 +174,10 @@
+ 				"<#LANHostConfig_x_DDNSWildcard_itemdesc#>",
+ 				"<#LANHostConfig_x_DDNSStatus_itemdesc#>");
+ 
++// DNSCrypt
++helpcontent[25] = new Array("",
++				"<#Adm_Svc_dnscrypt_desc#>");
++
+ 
+ function openTooltip(obj, hint_array_id, hint_show_id)
+ {

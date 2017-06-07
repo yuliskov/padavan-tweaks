@@ -1,0 +1,15 @@
+--- ./user/ntfs-3g/Makefile.orig	2016-06-20 16:35:50.719810919 +0300
++++ ./user/ntfs-3g/Makefile	2016-06-20 16:37:20.724068970 +0300
+@@ -1,2 +1,3 @@
++# http://www.tuxera.com/community/open-source-ntfs-3g
++SRC_NAME=ntfs-3g_ntfsprogs-2017.3.23
+-SRC_NAME=ntfsprogs-2014.2.15
+ 
+@@ -15,5 +16,6 @@
+ 
+ configure:
++	( test -d $(SRC_NAME) || tar -xzf $(SRC_NAME).tgz; \
++	cd $(SRC_NAME) ; \
+-	( cd $(SRC_NAME) ; \
+ 	./configure \
+ 		--prefix=/usr \

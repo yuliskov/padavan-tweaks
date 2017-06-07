@@ -1,0 +1,10 @@
+--- ./user/Makefile.orig	2016-06-20 16:35:50.719810919 +0300
++++ ./user/Makefile	2016-06-20 16:37:20.724068970 +0300
+@@ -114,6 +114,7 @@
+ dir_$(CONFIG_FIRMWARE_INCLUDE_TOR)	+= tor
+ dir_$(CONFIG_FIRMWARE_INCLUDE_PRIVOXY)	+= privoxy
+ dir_$(CONFIG_FIRMWARE_INCLUDE_DNSCRYPT)	+= dnscrypt-proxy
++dir_$(CONFIG_FIRMWARE_INCLUDE_KMS_SERVER)	+= kms-server
+ 
+ ifdef CONFIG_BLK_DEV_SD
+ dir_$(CONFIG_FIRMWARE_INCLUDE_HDPARM)		+= hdparm

@@ -1,0 +1,41 @@
+--- ./user/Makefile.orig	2016-06-20 16:35:50.719810919 +0300
++++ ./user/Makefile	2016-06-20 16:37:20.724068970 +0300
+@@ -111,6 +111,6 @@
+ dir_$(CONFIG_FIRMWARE_INCLUDE_XUPNPD)		+= xupnpd
+ dir_$(CONFIG_FIRMWARE_INCLUDE_TCPDUMP)		+= tcpdump
+-dir_$(SAMBA_ENABLED)				+= samba3
++dir_$(SAMBA_ENABLED)				+= samba36
+ dir_$(CONFIG_FIRMWARE_INCLUDE_TOR)	+= tor
+ dir_$(CONFIG_FIRMWARE_INCLUDE_PRIVOXY)	+= privoxy
+ dir_$(CONFIG_FIRMWARE_INCLUDE_DNSCRYPT)	+= dnscrypt-proxy
+--- ./user/rc/services_ex.c.orig	2016-06-20 16:35:50.719810919 +0300
++++ ./user/rc/services_ex.c	2016-06-20 16:37:20.724068970 +0300
+@@ -596,6 +596,8 @@
+ 	fprintf(fp, "obey pam restrictions = no\n");
+ 	fprintf(fp, "host msdfs = no\n");
+ 	fprintf(fp, "disable spoolss = yes\n");
++	fprintf(fp, "passdb backend = smbpasswd\n");
++	fprintf(fp, "max protocol = SMB2\n");
+ 
+ 	return fp;
+ }
+--- ./user/rc/services_stor.c.orig	2016-06-20 16:35:50.719810919 +0300
++++ ./user/rc/services_stor.c	2016-06-20 16:37:20.724068970 +0300
+@@ -508,15 +508,16 @@
+ 	if (!has_nmbd && !has_smbd) {
+ 		doSystem("rm -f %s", "/etc/samba/*");
++		system("touch /etc/samba/smbpasswd");
+ 		clean_smbd_trash();
+ 	}
+ 
+ 	write_smb_conf();
+ 
+ 	sh_num = nvram_safe_get_int("acc_num", 0, 0, MAX_ACCOUNT_NUM);
+ 	for (i = 0; i < sh_num; i++) {
+ 		snprintf(tmpuser, sizeof(tmpuser), "acc_username%d", i);
+ 		snprintf(tmp2, sizeof(tmp2), "acc_password%d", i);
+-		snprintf(cmd, sizeof(cmd), "smbpasswd %s %s", nvram_safe_get(tmpuser), nvram_safe_get(tmp2));
++		snprintf(cmd, sizeof(cmd), "echo -ne \"%s\n%s\n\" | smbpasswd -s -a %s", nvram_safe_get(tmp2), nvram_safe_get(tmp2), nvram_safe_get(tmpuser));
+ 		system(cmd);
+ 	}
+ 

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script>
+function back(e) {{
+    switch(e.keyCode) {{
+        case 8:
+        case 461:
+            window.NetCastBack();
+    }
+}
+
+function play(m3u) {{
+    m3u = m3u.replace('http://', '');
+    var templ = '<object type="application/vnd.apple.mpegurl" downloadable="false" autostart="true" style="width: 1280px; height: 720px;" data="http://%s"></object>';
+    document.body.innerHTML = templ.replace('%s', m3u);
+    //var el = document.createElement('div');
+    //el.innerHTML = templ.replace('%s', m3u);
+    //document.body.appendChild(el);
+    document.onkeydown = back;
+}
+
+function redirect(url) {{
+    url = url.replace('http://', '');
+    location.replace('//' + url);
+}
+
+function listCookies() {{
+    var theCookies = document.cookie.split(';');
+    var aString = '';
+    for (var i = 1 ; i <= theCookies.length; i++) {{
+        var cookie = theCookies[i-1].trim();
+        if (cookie == '')
+            continue;
+        aString += i + ' ' + cookie + "\n";
+    }
+
+    if (aString == '')
+        aString = 'emtpy\n';
+    
+    return '<pre style="white-space: pre-wrap;">' + 'Cookies:\n' + aString + '</pre>';
+}
+
+function listStorage() {{
+    var i = 1, sKey;
+    var aString = '';
+    for (; sKey = window.localStorage.key(i-1); i++) {{
+        aString += i + ' ' + sKey + '=' + window.localStorage.getItem(sKey) + '\n';
+    }
+
+    if (aString == '')
+        aString = 'empty\n';
+
+    return '<pre style="white-space: pre-wrap;">' + 'Storage:\n' + aString + '</pre>';
+}
+
+function clearStorage() {{
+    window.localStorage.clear();
+}
+
+function clearCookies() {{
+    var cookies = document.cookie.split(";");
+
+    for (var i = 0; i < cookies.length; i++) {{
+        var cookie = cookies[i];
+        var eqPos = cookie.indexOf("=");
+        var name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
+        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    }
+}
+
+function processQuery() {{
+    if ('NetCastSetDefaultAspectRatio' in window)
+        window.NetCastSetDefaultAspectRatio('original');
+    var href = location.href.replace('http://', '').replace(/\/$/, '');
+    switch(href) {{ 
+        case 'lg.ivi.ru':
+            redirect('smarttv.peers.tv/lg/master/index.html');
+            //redirect('smarttv.peers.tv/lg/master/allchannels.html');
+            break;
+        case 'smarttv.now.ru':
+            //redirect('wr.divan.tv');
+            redirect('youtube.com/tv');
+            break;
+        case 'www.zoomby.ru/ce/lg':
+        case 'apps.bradburylab.tv/rt':
+            //redirect('siptv.eu');
+            //redirect('http://siptv.eu/common/go_lg.php?mac=aa:3d:8c:92:2f:7d&man=LGE&ser=401WRFS3M827&mod=42LA660S-ZA&private=1');
+            //redirect('http://siptv.eu/common/go_lg.php?mac=ax:3d:8c:92:2f:7d&man=LGE&ser=401WRFS3M827&mod=42LA660S-ZA');
+            //redirect('all.siptv.eu/enter_lg.php?serial=401WRFS3M827&user=taAPE3lXQ8doc&private=1');
+            redirect('all.siptv.eu/enter_lg.php?serial=401WRFS3M827&private=1');
+            //redirect('all.siptv.eu/enter_lg.php?private=1');
+            break;
+        case 'stb.obigo.com/obigo/accuweather':
+        case 'connecttv.pelmorex.com/device/LG':
+            redirect('lgtv.accu-weather.com/lg/tv2/default.aspx');
+            break;
+        case 'lg.am.nemomedia.ru':
+            //redirect('lg.ss-iptv.com');
+            redirect('app.ss-iptv.com/?group=LG&version=1.0.0');
+            break;
+        case 'lg.nettv.ayyo.ru':
+        case 's.s-ports.ru/i/tvapp/lg/index.html':
+        case 'platform.nemo.tv':
+        case 'lg-app-hd.megogo.net':
+        case 'tv3.omlet.ru/tv/lg':
+            redirect('obovse.ru/ForkPlayer2.5/index.html?dns1');
+            break;
+        case 'lg.rutv.ru':
+            play('testlivestream.rfn.ru/live/smil:r24.smil/chunklist_b800000.m3u8?auth=vh&cast_id=21&start=0&end=0');
+            break;
+        case 'lgtv.1internet.tv':
+            play('euro.online.hls.cn.ru/streaming/1kanal/126/tvrec/playlist.m3u8');
+            break;
+        default:
+            document.body.style.backgroundColor = '';
+            document.body.innerHTML = '<h2>Content has been filtered.</h2>' + listCookies() + listStorage();
+            clearCookies();
+            clearStorage();
+    }
+}
+window.onload = processQuery;
+</script>
+</head>
+<body style="background-color: black; margin: auto; padding-left: 2em;">
+</body>
+</html>
+
+

@@ -1,0 +1,25 @@
+user-manual /usr/share/privoxy/user-manual
+confdir /etc/storage/privoxy
+logdir /tmp # origin - /var/log
+actionsfile match-all.action # Actions that are applied to all sites and maybe overruled later on.
+actionsfile default.action   # Main actions file
+actionsfile user.action      # User customizations
+filterfile default.filter
+filterfile user.filter      # User customizations
+logfile syslog.log # origin - privoxy.log
+debug  0 # 1 - log all requests
+listen-address  my.router:8118 # IPv6 loopback device: listen-address [::1]:8118
+toggle  1 # 0 - content filtering disabled
+enable-remote-toggle  0
+enable-remote-http-toggle  0
+enable-edit-actions 0 # enable/disable file editor
+enforce-blocks 0 # enable/disable "go there anyway" page
+buffer-limit 4096
+enable-proxy-authentication-forwarding 0
+forwarded-connect-retries  0
+accept-intercepted-requests 1
+allow-cgi-request-crunching 0
+split-large-forms 0
+keep-alive-timeout 5
+tolerate-pipelining 1
+socket-timeout 300
