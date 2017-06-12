@@ -1,5 +1,6 @@
 other/
 disabled/
+*.disabled
 tmp/
 notes.txt
 commit-theme.bat
