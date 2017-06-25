@@ -1,6 +1,6 @@
 # https://forums.mydigitallife.info/threads/50234-Emulated-KMS-Servers-on-non-Windows-platforms
 # prerequisites: sudo apt-get install p7zip-full
-SRC_NAME=vlmcsd-1110-2017-05-31-Hotbird64
+SRC_NAME=vlmcsd-1111-2017-06-17-Hotbird64
 THISDIR = $(shell pwd)
 
 all: config_test
