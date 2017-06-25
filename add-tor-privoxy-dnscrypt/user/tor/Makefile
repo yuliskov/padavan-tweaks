@@ -1,4 +1,4 @@
-SRC_NAME=tor-0.3.0.7
+SRC_NAME=tor-0.3.0.8
 DLSITE=https://dist.torproject.org
 
 CFLAGS += -Os -ffunction-sections -fdata-sections
