@@ -1,5 +1,5 @@
 # Update: https://sourceforge.net/projects/pcre/files/pcre/
-SRC_NAME=pcre-8.39
+SRC_NAME=pcre-8.40
 
 all: config_test
 	$(MAKE) -C $(SRC_NAME)

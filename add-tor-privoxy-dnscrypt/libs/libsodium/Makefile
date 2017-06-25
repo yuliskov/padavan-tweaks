@@ -1,4 +1,4 @@
-SRC_NAME=libsodium-1.0.10
+SRC_NAME=libsodium-1.0.12
 DLSITE=https://download.libsodium.org/libsodium/releases
 
 all: config_test

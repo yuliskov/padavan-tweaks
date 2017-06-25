@@ -1,5 +1,5 @@
 #SRC_NAME=dnscrypt-proxy-1.6.1
-SRC_NAME=dnscrypt-proxy-1.9.4
+SRC_NAME=dnscrypt-proxy-1.9.5
 DLSITE=https://download.dnscrypt.org/dnscrypt-proxy
 
 CFLAGS += -Os -ffunction-sections -fdata-sections
