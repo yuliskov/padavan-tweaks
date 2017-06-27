@@ -47,7 +47,7 @@ REM set SSH_LOGIN=user
 
 REM cleanup, patch in reverse order
 echo CLEANUP: remove patches in reverse order
-ssh %SSH_PORT% %SSH_LOGIN%@%IP_ADDR% "cd %REPO_PATH%/trunk; ls *.patch | sort -r | xargs cat | patch -r - -N -R -p0; rm -r *.patch user/samba36 user/privoxy user/tor user/kms-server user/tinyproxy libs/libpcre user/www/n56u_ribbon_fixed/*-theme"
+ssh %SSH_PORT% %SSH_LOGIN%@%IP_ADDR% "cd %REPO_PATH%/trunk; ls *.patch | sort -r | xargs cat | patch -r - -N -R -p0; rm -r *.patch *.patch.* user/samba36 user/privoxy user/tor user/kms-server user/tinyproxy libs/libpcre user/www/n56u_ribbon_fixed/*-theme"
 REM add custom files
 echo COPYING: add custom files
 REM scp %SCP_PORT% -r add-grey-theme-2/. add-common-files/. add-xiaomi-brand/. add-tinyproxy/. add-privoxy/. add-curl/. add-libs/. add-samba36/. add-paragon-ntfs/. add-ntfs-3g/. add-kms-server/. %SSH_LOGIN%@%IP_ADDR%:%REPO_PATH%/trunk/
