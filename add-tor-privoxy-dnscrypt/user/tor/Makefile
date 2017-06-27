@@ -16,7 +16,6 @@ config_test:
 
 configure:
 	( test -e $(SRC_NAME).tar.gz || wget $(DLSITE)/$(SRC_NAME).tar.gz; \
-	md5sum -c md5sum || exit; \
 	test -d $(SRC_NAME) || tar -xzf $(SRC_NAME).tar.gz; \
 	cd $(SRC_NAME) ; \
 	./configure \
@@ -44,10 +43,12 @@ romfs:
 	$(ROMFSINST) -p +x /usr/bin/tor.sh
 	mkdir -p $(INSTALLDIR)/usr/share/tor
 ifeq ($(CONFIG_FIRMWARE_INCLUDE_TOR_GEOIP),y)
+	cp $(SRC_NAME)/src/config/geoip .
 	$(ROMFSINST) /usr/share/tor/geoip
 endif
 ifeq ($(CONFIG_FIRMWARE_INCLUDE_TOR_GEOIPV6),y)
 ifeq ($(CONFIG_FIRMWARE_ENABLE_IPV6),y)
+	cp $(SRC_NAME)/src/config/geoip6 .
 	$(ROMFSINST) /usr/share/tor/geoip6
 endif
 endif
