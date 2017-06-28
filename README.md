@@ -7,6 +7,7 @@ Run *add-all.bat* to upload all tweaks to VM (e.g. VirtualBox)
 - web interface theme pack
 - router's front LED tweaks
 - new icon for DLNA
+- my_scripts dir: useful scripts intended to run within router
 
 ## List of new software:
 - KMS server for VL apps
