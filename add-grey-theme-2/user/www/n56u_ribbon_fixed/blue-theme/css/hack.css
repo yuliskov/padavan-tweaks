@@ -34,12 +34,6 @@ div.main_itoggle label.itoggle {
     height: 45px;
 }
 
-/* MAIN page, now menu, device list and option list has same height */
-#statusframe,
-div.well[style*="padding-left: 18px"] {
-    height: 505px !important;
-}
-
 /* Network traffic page > drop down height */
 select#sel_netif {
     height: 23px !important;

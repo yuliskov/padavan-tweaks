@@ -29,12 +29,6 @@ td#wan_status>span.label.label-success {
     height: 45px;
 }
 
-/* now menu, device list and option list has same height */
-#statusframe,
-div.well[style*="padding-left: 18px"] {
-    height: 505px !important;
-}
-
 /* USB page/VPN Client/Firewall > some elems wider than others */
 table#tbl_vpnc_server select[name=vpnc_sfw],
 table#tbl_smbd select[name=st_samba_mode],

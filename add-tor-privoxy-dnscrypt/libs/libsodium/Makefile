@@ -1,4 +1,4 @@
-SRC_NAME=libsodium-1.0.12
+SRC_NAME=libsodium-1.0.13
 DLSITE=https://download.libsodium.org/libsodium/releases
 
 all: config_test
@@ -13,7 +13,6 @@ config_test:
 
 configure:
 	( test -e $(SRC_NAME).tar.gz || wget $(DLSITE)/$(SRC_NAME).tar.gz; \
-	md5sum -c md5sum || exit; \
 	test -d $(SRC_NAME) || tar -xzf $(SRC_NAME).tar.gz; \
 	cd $(SRC_NAME) ; \
 	aclocal; \

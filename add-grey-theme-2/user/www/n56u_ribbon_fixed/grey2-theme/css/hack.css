@@ -68,12 +68,6 @@ body.body_iframe {
     margin-top: 400px !important;
 }
 
-/* MAIN page > all: menu, device list and option list has same height */
-#statusframe,
-div.well[style*="padding-left: 18px"] {
-    height: 505px !important;
-}
-
 /* Main page > center icons */
 div.well[style*="padding-left: 18px"] {
     padding-left: 5px !important;

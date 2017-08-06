@@ -809,7 +809,7 @@ function createSettingTable() {
     var tableBody = jQuery('<tbody></tbody>');
     var headerRow = jQuery('<tr></tr');
     tableBody.append(headerRow);
-    headerRow.append('<th colspan="2" style="background-color: #E3E3E3;">' + localize('Interface theme') + ' (' + getVersionName() + ', ' + getIndependentLink() + ')' + '</th>');
+    headerRow.append('<th colspan="2" style="background-color: #E3E3E3;">' + localize('Interface theme') + ' ' + getVersionName() + ' (' + getIndependentLink() + ')' + '</th>');
     table.append(tableBody);
     return table;
 }
@@ -1398,7 +1398,7 @@ function replaceAsusTo(name) {
 }
 
 function getVersionName() {
-    var version = "2.4.7";
+    var version = "2.4.8";
     return '<a href="http://4pda.ru/forum/index.php?showtopic=686221&view=findpost&p=44407278" target="blank" >v' + version + '</a>';
 }
 
