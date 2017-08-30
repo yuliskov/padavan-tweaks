@@ -7,3 +7,4 @@ commit-theme.bat
 add-aria2-transmission/
 release/
 *_bak/
+*.bak
