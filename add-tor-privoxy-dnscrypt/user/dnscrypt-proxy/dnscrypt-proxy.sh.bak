@@ -37,7 +37,8 @@ func_start(){
 			2)
 				cat >>$dmconf <<-EOF
 					strict-order
-					server=${ipaddr}#${port}
+					except-interface=lo
+					server="${ipaddr}#${port}"
 				EOF
 				echo "sed -i '/$ipaddr\$/d' $resolvconf" >>$pws
 				sed -i "/$ipaddr$/d" $resolvconf

@@ -931,7 +931,7 @@ function switchLogo() {
     $logo.removeClass(theme.logo);
     $logo.addClass(logoClass);
 
-    if (logoClass != 'RT-N56U') {
+    if (logoClass != 'MI-MINI') {
         theme.logo = logoClass;
         setCurrentTheme(theme);
     }
@@ -1205,7 +1205,7 @@ function findRouterId() {
         setCachedRouterId(matchedId);
     });
 
-    return 'RT-N56U';
+    return 'MI-MINI';
 }
 
 function chainProcess(fnArr, callback, num) {
@@ -1398,7 +1398,7 @@ function replaceAsusTo(name) {
 }
 
 function getVersionName() {
-    var version = "2.4.8";
+    var version = "2.4.9";
     return '<a href="http://4pda.ru/forum/index.php?showtopic=686221&view=findpost&p=44407278" target="blank" >v' + version + '</a>';
 }
 
