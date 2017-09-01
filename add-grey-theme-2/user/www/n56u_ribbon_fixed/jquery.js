@@ -913,7 +913,9 @@ function restoreLogo(defaultLogo) {
 
 function restoreLogoInternal(logoName) {
     console.log('retore logo: add class', logoName);
-    jQuery('div.#logo').addClass(logoName);
+    var $logo = jQuery('div#logo');
+    $logo.addClass(logoName);
+    $logo.addClass('temp-logo'); // placeholder for cases when logo not found
     addLogoSwitchWidget(logoName);
 }
 
@@ -931,10 +933,8 @@ function switchLogo() {
     $logo.removeClass(theme.logo);
     $logo.addClass(logoClass);
 
-    if (logoClass != 'MI-MINI') {
-        theme.logo = logoClass;
-        setCurrentTheme(theme);
-    }
+    theme.logo = logoClass;
+    setCurrentTheme(theme);
 
     updateIndependentLink();
 }
@@ -1398,7 +1398,7 @@ function replaceAsusTo(name) {
 }
 
 function getVersionName() {
-    var version = "2.4.9";
+    var version = "2.4.14";
     return '<a href="http://4pda.ru/forum/index.php?showtopic=686221&view=findpost&p=44407278" target="blank" >v' + version + '</a>';
 }
 
