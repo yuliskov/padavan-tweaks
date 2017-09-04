@@ -1,12 +1,14 @@
 #!/bin/sh
 
+# https://habrahabr.ru/post/329248/
+
 # блокировки сайтов в Украине: 
 # http://4pda.ru/forum/index.php?s=&showtopic=686221&view=findpost&p=61727672
 
 modprobe ip_set_hash_net
 modprobe xt_set
 ipset create tor-ua nethash
-# Списки блокируемых сетей с https://habrahabr.ru/post/329248/
+# Списки блокируемых сетей с https://zaborona.help/ips.txt
 echo "87.240.128.0/18
 93.186.224.0/20
 95.142.192.0/20
