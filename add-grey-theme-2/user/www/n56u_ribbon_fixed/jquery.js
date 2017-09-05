@@ -493,6 +493,7 @@ function localize(str) {
 	        'Logo Color': 'Цвет логотипа',
 	        'Text Color': 'Цвет текста',
 	        'Get settings link': 'получить ссылку с настройками',
+	        'Open in Bookmark Mode': 'Открыть как закладку',
 	    },
 	    zh: {
 	        'Interface theme': '界面主题',
@@ -510,6 +511,7 @@ function localize(str) {
 	        'Google Font': '字体名称',
 	        'Google Font Tooltip': '例如: Open Sans. 你可以在 <a target=\'blank\' href=\'http://google.com/fonts\'>http://google.com/fonts</a> 找到可用的字体列表.',
 	        'Get settings link': '获取主题链接',
+	        'Open in Bookmark Mode': '获取主题链接',
 	    }
 	};
     var userLang = detectLanguage();
@@ -809,7 +811,7 @@ function createSettingTable() {
     var tableBody = jQuery('<tbody></tbody>');
     var headerRow = jQuery('<tr></tr');
     tableBody.append(headerRow);
-    headerRow.append('<th colspan="2" style="background-color: #E3E3E3;">' + localize('Interface theme') + ' ' + getVersionName() + ' (' + getIndependentLink() + ')' + '</th>');
+    headerRow.append('<th colspan="2" style="background-color: #E3E3E3;">' + getThemeWidgetTitle() + ' - ' + getIndependentLink() + '</th>');
     table.append(tableBody);
     return table;
 }
@@ -1323,7 +1325,7 @@ function updateIndependentLink() {
 function getIndependentLink() {
     var theme = getCurrentTheme();
     var queryStr = "name=" + theme.name + "&" + "background=" + theme.background + "&" + "logo=" + theme.logo;
-    return '<a id="independentLink" href="http://my.router/#' + queryStr + '">' + localize('Get settings link') + '</a>';
+    return '<a id="independentLink" href="http://my.router/#' + queryStr + '">' + localize('Open in Bookmark Mode') + '</a>';
 }
 
 function convertObjectToQuery(object) {
@@ -1370,6 +1372,11 @@ function addAriaWebControlLink() {
     });
 }
 
+// Footer links:
+// Sources: https://bitbucket.org/padavan/rt-n56u
+// Community: http://forum.ixbt.com/topic.cgi?id=14:63903:l#l
+// Prometheus: http://4pda.ru/forum/index.php?showtopic=714487&view=getnewpost
+// All Rights: http://prometheus.freize.net/distribution.html
 function appendCopyright() {
     var subFooter = jQuery('<div id="subFooter"></div>');
     var copyright1 = jQuery('<div align="center" class="copyright"></div>');
@@ -1377,11 +1384,11 @@ function appendCopyright() {
     var copyright3 = jQuery('<div align="center" class="copyright"></div>');
     
     var date = new Date();
-    copyright1.append('<a href="https://bitbucket.org/padavan/rt-n56u" target="blank">© 2011-' + date.getFullYear() + ' Padavan &amp; N56U project community</a>');
-    copyright2.append('<a href="http://4pda.ru/forum/index.php?showtopic=686221&view=findpost&p=44407278" target="blank">Skins by Dave Medissn for 4PDA</a>');
+    copyright1.append('<a href="http://forum.ixbt.com/topic.cgi?id=14:63903:l#l" target="blank">© 2011-' + date.getFullYear() + ' Padavan &amp; N56U project community</a>');
+    copyright2.append('<a href="http://4pda.ru/forum/index.php?showtopic=686221&st=240&view=findpost&p=42644113" target="blank">Skins by Dave Medissn for 4PDA</a>');
     copyright3.append('<a href="http://prometheus.freize.net/distribution.html" target="blank">Compiled by Prometheus. Firmware distribution is prohibited</a>');
     
-    subFooter.append(copyright1, copyright3);
+    subFooter.append(copyright1, copyright2, copyright3);
     jQuery('#footer').after(subFooter);
 
     // hide original copyright
@@ -1393,13 +1400,13 @@ function appendCopyright() {
 function replaceAsusTo(name) {
     console.log('replaceAsusTo: ', name);
     replaceText('.alert.alert-info a:contains("ASUS RT-N56U")', "ASUS RT-N56U", name)
-        .attr('href', "http://prometheus.freize.net");
+        .attr('href', "http://4pda.ru/forum/index.php?showtopic=714487&view=getnewpost");
     replaceText('div#Senario span.label.label-info', "ASUS", name);
 }
 
-function getVersionName() {
-    var version = "2.4.14";
-    return '<a href="http://4pda.ru/forum/index.php?showtopic=686221&view=findpost&p=44407278" target="blank" >v' + version + '</a>';
+function getThemeWidgetTitle() {
+    var version = "2.4.17";
+    return '<a href="http://4pda.ru/forum/index.php?showtopic=686221&view=findpost&p=44407278" target="blank" >' + localize('Interface theme') + ' v' + version + '</a>';
 }
 
 /* END COMMON UTILS */

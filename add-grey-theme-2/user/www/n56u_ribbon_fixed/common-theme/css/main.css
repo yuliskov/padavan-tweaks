@@ -1,8 +1,9 @@
- BACKGROUND */
+/* BACKGROUND */
 
 /* more bg patterns at http://subtlepatterns.com and http://thepatternlibrary.com */
 /* also see http://www.awwwards.com/background-patterns-designs-and-resources-for-websites.html */
 
+body.dark-bg,
 body.default-asus {
     background: url("/bootstrap/img/dark-bg.jpg") repeat scroll center top transparent;
 }
@@ -336,6 +337,13 @@ div.ZBT-WE1326,
 div.ZBT-WG3526,
 div.zbt {
     background-image: url("../img/logo/zbt.png") !important;
+    width: 220px !important;
+    height: 100px !important;
+}
+div.U7621-03,
+div.U7621-06,
+div.unielec {
+    background-image: url("../img/logo/unielec.png") !important;
     width: 220px !important;
     height: 100px !important;
 }
