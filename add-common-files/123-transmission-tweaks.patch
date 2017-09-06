@@ -1,0 +1,28 @@
+--- ./user/transmission/transmission.sh.orig	2016-06-20 16:35:50.719810919 +0300
++++ ./user/transmission/transmission.sh	2016-06-20 16:37:20.724068970 +0300
+@@ -46,19 +46,25 @@
+ 	# create default settings.json
+ 	if [ ! -f "$DIR_CFG/settings.json" ] ; then
+ 		tr_user=`nvram get http_username`
+ 		tr_pass=`nvram get http_passwd`
+ 		$SVC_PATH -w "$DIR_DL1" --incomplete-dir "$DIR_DL2" -c "$DIR_DL3" --no-incomplete-dir -y -L 90 -l 30 --no-utp -M -t -u "$tr_user" -v "$tr_pass" -P "$tr_pport" -p "$tr_rport" -x /var/run/transmission.pid -d 2>/tmp/settings.json
+ 		sed -i 's|"umask": 18,|"umask": 0,|g' /tmp/settings.json
++		sed -i 's|"ratio-limit": 2,|"ratio-limit": 0,|g' /tmp/settings.json
++		sed -i 's|"ratio-limit-enabled": false,|"ratio-limit-enabled": true,|g' /tmp/settings.json
++		sed -i 's|"speed-limit-down": 1000,|"speed-limit-down": 3000,|g' /tmp/settings.json
++		sed -i 's|"speed-limit-down-enabled": false,|"speed-limit-down-enabled": true,|g' /tmp/settings.json
++		sed -i 's|"speed-limit-up": 1000,|"speed-limit-up": 100,|g' /tmp/settings.json
++		sed -i 's|"speed-limit-up-enabled": false,|"speed-limit-up-enabled": true,|g' /tmp/settings.json
+ 		mv /tmp/settings.json "$DIR_CFG/settings.json"
+ 	fi
+ 	
+ 	svc_user=""
+ 	
+ 	# check start-stop-daemon stuff
+ 	if [ $SVC_ROOT -eq 0 ] ; then
+ 		chmod 777 "${DIR_LINK}"
+ 		chown -R nobody "$DIR_CFG"
+ 		chown -R nobody "$DIR_DL2"
+ 		chmod -R 777 "$DIR_DL1"
+ 		svc_user=" -c nobody"
+ 	fi
