@@ -72,3 +72,6 @@ echo "87.240.128.0/18
 93.159.224.0/21
 213.180.193.105
 87.250.251.105" | while read net; do ipset add tor-ua $net; done
+
+# блокировка сайтов в Украине
+#iptables -t nat -I PREROUTING -i br0 -p tcp -m set --match-set tor-ua dst -m multiport --dports 80,443 -j REDIRECT --to-ports 9040
