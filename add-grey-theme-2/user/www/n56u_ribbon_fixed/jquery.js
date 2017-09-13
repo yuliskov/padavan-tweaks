@@ -1405,7 +1405,7 @@ function replaceAsusTo(name) {
 }
 
 function getThemeWidgetTitle() {
-    var version = "2.4.17";
+    var version = "2.4.18";
     return '<a href="http://4pda.ru/forum/index.php?showtopic=686221&view=findpost&p=44407278" target="blank" >' + localize('Interface theme') + ' v' + version + '</a>';
 }
 
