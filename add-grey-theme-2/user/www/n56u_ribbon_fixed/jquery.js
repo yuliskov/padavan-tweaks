@@ -99,19 +99,40 @@ function localStorageSetItem(key, val) {
     localStorage.setItem(key, strVal);
 }
 
-function urlExists(url, onSuccess, onError)
-{
+function urlExists(url, onSuccess, onError) {
     if (!onSuccess) {
         onSuccess = function(){};
     }
     if (!onError) {
         onError = function(){};
     }
-    // prevent caching
+    // NOTE: prevent caching
     var queryString = '?time=' + new Date().getTime();
     jQuery.ajax({
         url: url + queryString,
-        type:'GET',
+        type: 'HEAD', 
+        success: function(data, status, request) {
+            if(request.getResponseHeader('Content-Length')) 
+                onSuccess();
+            else 
+                onError();
+        },
+        error: function(xhr){onError(xhr.status)}
+    });
+}
+
+function urlExists_Old(url, onSuccess, onError, noCache) {
+    if (!onSuccess) {
+        onSuccess = function(){};
+    }
+    if (!onError) {
+        onError = function(){};
+    }
+    // NOTE: prevent caching
+    var queryString = noCache ? '?time=' + new Date().getTime() : '';
+    jQuery.ajax({
+        url: url + queryString,
+        type: 'GET', // NOTE: HEAD is not working here 
         success: function(data) {if(data.trim()) onSuccess(); else onError()},
         error: function(xhr){onError(xhr.status)}
     });
@@ -279,6 +300,7 @@ function switchThemeStyle() {
         case '':
             break;
         default:
+            // NOTE: Don't even think about improving layout mess fix. You're literally wouldn'd find any better approaches.
             replaceCSS('/bootstrap/css/bootstrap.min.css', getThemeRootDir('bootstrap') + '/css/bootstrap.min.css', 'defaultStyle');
             replaceCSS('/bootstrap/css/main.css', getThemeRootDir('main') + '/css/main.css', 'defaultStyle');
             replaceCSS('/bootstrap/css/engage.itoggle.css', getThemeRootDir('itoggle') + '/css/engage.itoggle.css', 'defaultStyle');
@@ -290,9 +312,11 @@ function switchThemeStyle() {
     appendCSS('/custom' + commonTheme);
 }
 
-function appendCSS(cssFile) {
+function appendCSS(cssFile, newId) {
     var head = jQuery("head");
     var newStyle = jQuery('<link rel="stylesheet" type="text/css" href="' + cssFile + '">');
+    if (newId)
+        newStyle.attr('id', newId);
     head.append(newStyle);
 }
 
@@ -309,13 +333,22 @@ function addCustomCSSStyle(rules, newId, anchorObj) {
     anchorObj.after('<style id="' + newId + '" type="text/css">' + rules + '</style>');
 }
 
+function replaceCSS_New(oldCSS, newCSS, newId) {
+    var oldlink = jQuery("link[rel='stylesheet'][href$='" + oldCSS + "']"); // ends with
+    var oldCssFile = oldlink.attr('href');
+    appendCSS(newCSS, newId);
+    oldlink.remove();
+    // NOTE: fixed: big performance hit
+    urlExists(newCSS, null, function() {appendCSS(oldCssFile)});
+}
+
 function replaceCSS(oldCSS, newCSS, newId) {
     var oldlink = jQuery("link[rel='stylesheet'][href$='" + oldCSS + "']"); // ends with
     var oldCssFile = oldlink.attr('href');
     oldlink.attr('href', newCSS);
     if (newId)
         oldlink.attr('id', newId);
-    // tooo slooow, so only wait for error
+    // NOTE: fixed: big performance hit
     urlExists(newCSS, null, function() {oldlink.attr('href', oldCssFile)});
 }
 
@@ -348,8 +381,17 @@ function redirectToRouterHub() {
     location.href = newUrl;
 }
 
+// NOTE: full solution: https://stackoverflow.com/questions/7054795/adding-a-script-to-the-page-dynamically-with-jquery-never-uses-the-cached-file
+function initJQueryCaching() {
+    jQuery.ajaxPrefilter(function(options, originalOptions, jqXHR) {
+        options.cache = true;
+    });
+}
+
 function restoreThemeStyle() {
     // redirectToRouterHub();
+
+    initJQueryCaching();
 
     initThemeFromUrl(); // example: http://my.router/#theme=white-theme&background=marvel
 
@@ -360,23 +402,6 @@ function restoreThemeStyle() {
 
     replaceTabTitle(findRouterId());
     replaceTabIcon(findRouterId());
-
-    // if (isCurrentLogo('xiaomi')) {
-    //     replaceTabTitle(getCachedRouterId());
-    //     replaceTabIcon();
-    // }
-
-    // if (isCurrentLogo('nexx')) {
-    //     replaceTabTitle('NEXX');
-    // }
-
-    // if (isCurrentLogo('belkin')) {
-    //     replaceTabTitle('Belkin');
-    // }
-
-    // if (isCurrentLogo('samsung')) {
-    //     replaceTabTitle('Samsung');
-    // }
 }
 
 // FIRST ENTRY POINT
@@ -634,25 +659,6 @@ function loadThisScriptInIframe() {
     }).css('visibility', 'hidden'); // for smooth theme appearance
 }
 
-function fetchLines(url, callback) {
-    // prevent caching
-    var queryString = '?time=' + new Date().getTime();
-    jQuery.get(url + queryString, function(data){
-        var lines = data.split('\n');
-        var result = [];
-        var len = lines.length;
-        for (var i = 0; i < len; i++) {
-            var line = lines[i].trim();
-            if (line) {
-                result.push(line);
-            }
-        }
-        if (callback) {
-            callback(result);
-        }
-    });
-}
-
 function quessOptionsFullPath(urlArr) {
     var newArr = [];
     for (var i = 0; i < urlArr.length; i++) {
@@ -669,6 +675,38 @@ function quessOptionsFullPath(urlArr) {
     urlArr = newArr;
     
     return urlArr;
+}
+
+function doCachedGet(url, callback) {
+    if (!window.cache4GetQuery)
+        window.cache4GetQuery = {};
+    var data = window.cache4GetQuery[url];
+    if (data)
+        callback(data);
+    else 
+        jQuery.get(url, function(data){
+            window.cache4GetQuery[url] = data;
+            callback(data);
+        });
+}
+
+function fetchLines(url, callback) {
+    // NOTE: prevent caching
+    var queryString = '?time=' + new Date().getTime();
+    doCachedGet(url + queryString, function(data){
+        var lines = data.split('\n');
+        var result = [];
+        var len = lines.length;
+        for (var i = 0; i < len; i++) {
+            var line = lines[i].trim();
+            if (line) {
+                result.push(line);
+            }
+        }
+        if (callback) {
+            callback(result);
+        }
+    });
 }
 
 // consumes array or single item
@@ -694,7 +732,7 @@ function fetchMultiLines(urlArr, callback, idx) {
     fetchLines(url, function(list) {
         callback(list, url, isLast);
         fetchMultiLines(urlArr, callback, ++idx);
-    })
+    });
 }
 
 function getCommonOptionsDir(listUrl) {
@@ -851,6 +889,7 @@ function addThemeSwitchWidget() {
         null, 
         function($option, lastUrl, $dropDown){
             $option.data('url', lastUrl);
+            // NOTE: big performance hit
             isThemeExists($option.val(), lastUrl, null, function(){$option.remove()});
         },
         null, 1, 1);
@@ -1405,7 +1444,7 @@ function replaceAsusTo(name) {
 }
 
 function getThemeWidgetTitle() {
-    var version = "2.4.18";
+    var version = "2.4.19";
     return '<a href="http://4pda.ru/forum/index.php?showtopic=686221&view=findpost&p=44407278" target="blank" >' + localize('Interface theme') + ' v' + version + '</a>';
 }
 
