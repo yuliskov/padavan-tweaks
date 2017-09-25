@@ -1,5 +1,18 @@
 /* OVERRIDE STYLES */
 
+
+/* fixing non-proper round icons on main page */
+.badge {
+    padding: 2px;
+    padding-bottom: 3px;
+}
+
+/* fixing: tabs can fit to page width in USB - General Settings (Rus) */
+.nav-tabs>li>a {
+    padding-right: 5px;
+    padding-left: 5px;
+}
+
 /* add missing icons */
 /* fix overlayed icons in bottom section by add anchor to selection */
 .big-icons-usb:empty,

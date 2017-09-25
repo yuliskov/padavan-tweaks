@@ -99,7 +99,34 @@ function localStorageSetItem(key, val) {
     localStorage.setItem(key, strVal);
 }
 
+// NOTE: cached version of urlExistsOrig
 function urlExists(url, onSuccess, onError) {
+    if (!onSuccess) {
+        onSuccess = function(){};
+    }
+    if (!onError) {
+        onError = function(){};
+    }
+
+    if (!window.cache4UrlExists)
+        window.cache4UrlExists = {};
+    var data = window.cache4UrlExists[url];
+    if (typeof data === 'undefined') {
+        urlExistsOrig(url, function () {
+            window.cache4UrlExists[url] = true;
+            onSuccess();
+        }, function () {
+            window.cache4UrlExists[url] = false;
+            onError();
+        });
+    } else {
+        console.log('urlExists: cache hit!!', url);
+        var callFn = data ? onSuccess : onError;
+        callFn();
+    }
+}
+
+function urlExistsOrig(url, onSuccess, onError) {
     if (!onSuccess) {
         onSuccess = function(){};
     }
@@ -121,7 +148,7 @@ function urlExists(url, onSuccess, onError) {
     });
 }
 
-function urlExists_Old(url, onSuccess, onError, noCache) {
+function urlExistsOrig_Old(url, onSuccess, onError, noCache) {
     if (!onSuccess) {
         onSuccess = function(){};
     }
@@ -262,15 +289,6 @@ function isCurrentLogo(name) {
     return false;
 }
 
-// TODO: remove
-// function isAsusTheme() {
-//     var theme = getCurrentTheme();
-//     if (!theme.url || !theme.name) {
-//         return true;
-//     }
-//     return false;
-// }
-
 function isAsusTheme() {
     var theme = getCurrentTheme();
     if (theme.name == getDefaultThemeName()) {
@@ -314,7 +332,8 @@ function switchThemeStyle() {
 
 function appendCSS(cssFile, newId) {
     var head = jQuery("head");
-    var newStyle = jQuery('<link rel="stylesheet" type="text/css" href="' + cssFile + '">');
+    var newStyle = jQuery('<link rel="stylesheet" type="text/css">');
+    newStyle.attr('href', cssFile);
     if (newId)
         newStyle.attr('id', newId);
     head.append(newStyle);
@@ -418,14 +437,15 @@ function replaceTabTitle(newTitle) {
 /* tab icon */
 
 function replaceTabIcon(routerId) {
+	var iconName = 'asus';
     switch (routerId) {
         case 'MI-3':
+        case 'MI-3C':
+        case 'MI-R3G':
         case 'MI-MINI':
         case 'MI-NANO':
             iconName = 'xiaomi';
             break;
-        default:
-            iconName = 'asus';
     }
 
     var href = getCommonImageDir() + '/favicon/' + iconName + '.ico';
@@ -677,23 +697,29 @@ function quessOptionsFullPath(urlArr) {
     return urlArr;
 }
 
-function doCachedGet(url, callback) {
+
+// NOTE: cached version of fetchLinesOrig
+function fetchLines(url, callback) {
+    if (!callback)
+        callback = function(){};
     if (!window.cache4GetQuery)
         window.cache4GetQuery = {};
     var data = window.cache4GetQuery[url];
-    if (data)
-        callback(data);
-    else 
-        jQuery.get(url, function(data){
-            window.cache4GetQuery[url] = data;
-            callback(data);
+    if (typeof data === 'undefined') {
+        fetchLinesOrig(url, function (result) {
+            window.cache4GetQuery[url] = result;
+            callback(result);
         });
+    } else {
+        console.log('fetchLines: cache hit!!', url);
+        callback(data);
+    }
 }
 
-function fetchLines(url, callback) {
+function fetchLinesOrig(url, callback) {
     // NOTE: prevent caching
     var queryString = '?time=' + new Date().getTime();
-    doCachedGet(url + queryString, function(data){
+    jQuery.get(url + queryString, function(data){
         var lines = data.split('\n');
         var result = [];
         var len = lines.length;
@@ -889,7 +915,7 @@ function addThemeSwitchWidget() {
         null, 
         function($option, lastUrl, $dropDown){
             $option.data('url', lastUrl);
-            // NOTE: big performance hit
+            // NOTE: fixed: big performance hit
             isThemeExists($option.val(), lastUrl, null, function(){$option.remove()});
         },
         null, 1, 1);
@@ -1239,6 +1265,9 @@ function findRouterId() {
         var matchedId = null;
 
         var matchArr = content.match("DNS request will be processed by ([\\w\\n-]*)");
+        if (!matchArr)
+        	return;
+
         if (matchArr[1])
             matchedId = matchArr[1];
 
@@ -1413,9 +1442,9 @@ function addAriaWebControlLink() {
 
 // Footer links:
 // Sources: https://bitbucket.org/padavan/rt-n56u
-// Community: http://forum.ixbt.com/topic.cgi?id=14:63903:l#l
+// IXBT Community: http://forum.ixbt.com/topic.cgi?id=14:63903:l#l
 // Prometheus: http://4pda.ru/forum/index.php?showtopic=714487&view=getnewpost
-// All Rights: http://prometheus.freize.net/distribution.html
+// Copyright: http://prometheus.freize.net/distribution.html
 function appendCopyright() {
     var subFooter = jQuery('<div id="subFooter"></div>');
     var copyright1 = jQuery('<div align="center" class="copyright"></div>');
@@ -1423,11 +1452,11 @@ function appendCopyright() {
     var copyright3 = jQuery('<div align="center" class="copyright"></div>');
     
     var date = new Date();
-    copyright1.append('<a href="http://forum.ixbt.com/topic.cgi?id=14:63903:l#l" target="blank">© 2011-' + date.getFullYear() + ' Padavan &amp; N56U project community</a>');
+    copyright1.append('<a href="https://bitbucket.org/padavan/rt-n56u" target="blank">© 2011-' + date.getFullYear() + ' Padavan &amp; N56U project community</a>');
     copyright2.append('<a href="http://4pda.ru/forum/index.php?showtopic=686221&st=240&view=findpost&p=42644113" target="blank">Skins by Dave Medissn for 4PDA</a>');
     copyright3.append('<a href="http://prometheus.freize.net/distribution.html" target="blank">Compiled by Prometheus. Firmware distribution is prohibited</a>');
     
-    subFooter.append(copyright1, copyright2, copyright3);
+    subFooter.append(copyright1, copyright3, copyright2);
     jQuery('#footer').after(subFooter);
 
     // hide original copyright
@@ -1436,15 +1465,18 @@ function appendCopyright() {
     head.append('<style id="hideCopyright" type="text/css">' + selector + '</style>');
 }
 
+// Download links:
+// Prometheus: http://prometheus.freize.net/index.html
+// Prometheus: http://4pda.ru/forum/index.php?showtopic=714487&view=getnewpost
 function replaceAsusTo(name) {
     console.log('replaceAsusTo: ', name);
     replaceText('.alert.alert-info a:contains("ASUS RT-N56U")', "ASUS RT-N56U", name)
-        .attr('href', "http://4pda.ru/forum/index.php?showtopic=714487&view=getnewpost");
+        .attr('href', "http://prometheus.freize.net");
     replaceText('div#Senario span.label.label-info', "ASUS", name);
 }
 
 function getThemeWidgetTitle() {
-    var version = "2.4.19";
+    var version = "2.4.23";
     return '<a href="http://4pda.ru/forum/index.php?showtopic=686221&view=findpost&p=44407278" target="blank" >' + localize('Interface theme') + ' v' + version + '</a>';
 }
 

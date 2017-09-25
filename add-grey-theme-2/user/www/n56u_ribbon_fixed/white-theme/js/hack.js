@@ -73,13 +73,15 @@ function restorePaletteFromStorage(processFn) {
         return;
     var links = jQuery('link[rel="stylesheet"]');
     links.each(function(idx) {
+        // NOTE: we trust palette that next style be our style
         var $link = jQuery(this);
         if (len && (idx < len)) {
             var cssContent = palette[idx];
             if (processFn)
                 cssContent = processFn(cssContent, $link.attr('href'));
 
-            addCustomCSSStyle(cssContent, 'paletteStyle' + idx, $link);
+            // NOTE: fix logo color when restoring theme from url: place all styles at the end
+            appendCustomCSSStyle(cssContent, 'paletteStyle' + idx);
 
             palette[idx] = cssContent;
             setCurrentPalette(palette);
@@ -158,6 +160,8 @@ function transformPalette(cssContent, cssUrl) {
     // fix relative paths
     var currentDir = cssUrl.replace(/[^\/]*\.css/i, '../');
     cssContent = cssContent.replace(/\.\.\//gi, currentDir);
+    // NOTE: for debug purposes
+    cssContent = '/* ORIGINAL URL: ' + cssUrl + ' */\n\n' + cssContent;
     return cssContent;
 }
 
