@@ -1,2 +1,0 @@
-restoreLogo('xiaomi-big');
-restoreBackground();
