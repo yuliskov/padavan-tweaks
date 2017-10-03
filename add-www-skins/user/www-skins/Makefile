@@ -1,4 +1,4 @@
-SRC_NAME=PadavanThemePack_v2.4.24
+SRC_NAME=PadavanThemePack_v2.4.26
 THISDIR = $(shell pwd)
 
 all: config_test
