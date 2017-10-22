@@ -1,5 +1,16 @@
 --- ./user/transmission/transmission.sh.orig	2016-06-20 16:35:50.719810919 +0300
 +++ ./user/transmission/transmission.sh	2016-06-20 16:37:20.724068970 +0300
+@@ -6,8 +6,8 @@
+ SVC_ROOT=0
+ 
+ # process priority (0-normal, 19-lowest)
+-SVC_PRIORITY=5
++SVC_PRIORITY=19
+ #######################################################################
+ 
+ SVC_NAME="Transmission"
+ SVC_PATH="/usr/bin/transmission-daemon"
+ DIR_LINK="/mnt/transmission"
 @@ -46,19 +46,26 @@
  	# create default settings.json
  	if [ ! -f "$DIR_CFG/settings.json" ] ; then
