@@ -580,7 +580,8 @@
 +++ ./user/shared/defaults.c	2016-06-20 16:37:20.725068961 +0300
 @@ -578,6 +578,12 @@
  	{ "telnetd", "1" },
- 	{ "sshd_enable", "0" },
+-	{ "sshd_enable", "0" },
++	{ "sshd_enable", "1" },
  	{ "wins_enable", "0" },
 +	{ "tor_enable", "0" },
 +	{ "privoxy_enable", "0" },
