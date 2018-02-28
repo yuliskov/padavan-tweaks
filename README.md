@@ -20,3 +20,17 @@ Run *add-all.bat* to upload all tweaks to VM (e.g. VirtualBox)
 - NTFS-3G (latest)
 - OpenVPN (latest)
 - Samba (3.6)
+
+## Do tests:
+
+Replace web-admin folder:
+``` 
+mount -o bind /media/Transcend/other/padavan-theme /www 
+
+killall httpd
+```
+
+Revert back:
+```
+umount -l /www
+```
